@@ -7,19 +7,19 @@
 /// 2.  Authorize upgrade.
 /// 3.  Upgrade.
 /// 4.  Commit upgrade.
-module pyth::contract_upgrade {
+module pyth_navi::contract_upgrade {
     use sui::event::{Self};
     use sui::object::{ID};
     use sui::package::{UpgradeReceipt, UpgradeTicket};
     use wormhole::bytes32::{Self, Bytes32};
     use wormhole::cursor::{Self};
 
-    use pyth::state::{Self, State};
-    use pyth::governance_instruction::{Self};
-    use pyth::governance_action::{Self};
-    use pyth::governance::{Self, WormholeVAAVerificationReceipt};
+    use pyth_navi::state::{Self, State};
+    use pyth_navi::governance_instruction::{Self};
+    use pyth_navi::governance_action::{Self};
+    use pyth_navi::governance::{Self, WormholeVAAVerificationReceipt};
 
-    friend pyth::migrate;
+    friend pyth_navi::migrate;
 
     /// Digest is all zeros.
     const E_DIGEST_ZERO_BYTES: u64 = 0;
@@ -42,7 +42,7 @@ module pyth::contract_upgrade {
     /// because a contract upgrade is only relevant to one particular network
     /// (in this case Sui), whose build digest is encoded in this message.
     public fun authorize_upgrade(
-        pyth_state: &mut State,
+        pyth_navi_state: &mut State,
         receipt: WormholeVAAVerificationReceipt,
     ): UpgradeTicket {
 
@@ -51,15 +51,15 @@ module pyth::contract_upgrade {
         let sequence = governance::take_sequence(&receipt);
 
         // Require that new sequence number is greater than last executed sequence number.
-        assert!(sequence > state::get_last_executed_governance_sequence(pyth_state),
+        assert!(sequence > state::get_last_executed_governance_sequence(pyth_navi_state),
             E_CANNOT_EXECUTE_GOVERNANCE_ACTION_WITH_OBSOLETE_SEQUENCE_NUMBER);
 
         // Update latest executed sequence number to current one.
-        state::set_last_executed_governance_sequence_unchecked(pyth_state, sequence);
+        state::set_last_executed_governance_sequence_unchecked(pyth_navi_state, sequence);
 
         let digest = take_upgrade_digest(receipt);
         // Proceed with processing new implementation version.
-        handle_upgrade_contract(pyth_state, digest)
+        handle_upgrade_contract(pyth_navi_state, digest)
     }
 
 
@@ -109,10 +109,10 @@ module pyth::contract_upgrade {
     }
 
     fun handle_upgrade_contract(
-        pyth_state: &mut State,
+        pyth_navi_state: &mut State,
         digest: Bytes32
     ): UpgradeTicket {
-        state::authorize_upgrade(pyth_state, digest)
+        state::authorize_upgrade(pyth_navi_state, digest)
     }
 
     fun deserialize(payload: vector<u8>): UpgradeContract {
@@ -140,6 +140,6 @@ module pyth::contract_upgrade {
 }
 
 #[test_only]
-module pyth::upgrade_contract_tests {
+module pyth_navi::upgrade_contract_tests {
     // TODO
 }

@@ -1,12 +1,12 @@
 /// The previous version of the contract sent the fees to a recipient address but this state is not used anymore
 /// This module is kept for backward compatibility
-module pyth::set_fee_recipient {
+module pyth_navi::set_fee_recipient {
     use wormhole::cursor;
     use wormhole::external_address::{Self};
 
-    use pyth::state::{Self, State, LatestOnly};
+    use pyth_navi::state::{Self, State, LatestOnly};
 
-    friend pyth::governance;
+    friend pyth_navi::governance;
 
     struct PythFeeRecipient {
         recipient: address

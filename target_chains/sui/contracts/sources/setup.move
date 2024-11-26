@@ -1,15 +1,15 @@
-module pyth::setup {
+module pyth_navi::setup {
     use sui::object::{Self, UID};
     use sui::package::{Self, UpgradeCap};
     use sui::transfer::{Self};
     use sui::tx_context::{Self, TxContext};
 
-    use pyth::state::{Self};
-    use pyth::data_source::{DataSource};
+    use pyth_navi::state::{Self};
+    use pyth_navi::data_source::{DataSource};
 
-    friend pyth::pyth;
+    friend pyth_navi::pyth_navi;
     #[test_only]
-    friend pyth::pyth_tests;
+    friend pyth_navi::pyth_navi_tests;
 
     /// Capability created at `init`, which will be destroyed once
     /// `init_and_share_state` is called. This ensures only the deployer can
@@ -34,7 +34,7 @@ module pyth::setup {
         // This will be created and sent to the transaction sender
         // automatically when the contract is published.
         transfer::public_transfer(
-            sui::package::test_publish(object::id_from_address(@pyth), ctx),
+            sui::package::test_publish(object::id_from_address(@pyth_navi), ctx),
             tx_context::sender(ctx)
         );
     }

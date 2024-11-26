@@ -1,5 +1,5 @@
-module pyth::price_status {
-    //use pyth::error;
+module pyth_navi::price_status {
+    //use pyth_navi::error;
 
     /// The price feed is not currently updating for an unknown reason.
     const UNKNOWN: u64 = 0;

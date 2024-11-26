@@ -10,24 +10,24 @@
 /// Included in migration is the ability to ensure that breaking changes for
 /// any of Pyth's methods by enforcing the current build version as
 /// their required minimum version.
-module pyth::migrate {
+module pyth_navi::migrate {
     use sui::object::{ID};
 
-    use pyth::state::{Self, State};
-    use pyth::contract_upgrade::{Self};
-    use pyth::governance::{WormholeVAAVerificationReceipt};
+    use pyth_navi::state::{Self, State};
+    use pyth_navi::contract_upgrade::{Self};
+    use pyth_navi::governance::{WormholeVAAVerificationReceipt};
 
     struct MigrateComplete has drop, copy {
         package: ID
     }
 
     public fun migrate(
-        pyth_state: &mut State,
+        pyth_navi_state: &mut State,
         receipt: WormholeVAAVerificationReceipt,
     ) {
 
         // Perform standard migrate.
-        handle_migrate(pyth_state, receipt);
+        handle_migrate(pyth_navi_state, receipt);
 
         ////////////////////////////////////////////////////////////////////////
         //
@@ -49,29 +49,29 @@ module pyth::migrate {
     }
 
     fun handle_migrate(
-        pyth_state: &mut State,
+        pyth_navi_state: &mut State,
         receipt: WormholeVAAVerificationReceipt,
     ) {
         // See `version_control` module for hard-coded configuration.
-        state::migrate_version(pyth_state);
+        state::migrate_version(pyth_navi_state);
 
         // This capability ensures that the current build version is used.
-        let latest_only = state::assert_latest_only(pyth_state);
+        let latest_only = state::assert_latest_only(pyth_navi_state);
 
         let digest = contract_upgrade::take_upgrade_digest(receipt);
         state::assert_authorized_digest(
             &latest_only,
-            pyth_state,
+            pyth_navi_state,
             digest
         );
 
         // Finally emit an event reflecting a successful migrate.
-        let package = state::current_package(&latest_only, pyth_state);
+        let package = state::current_package(&latest_only, pyth_navi_state);
         sui::event::emit(MigrateComplete { package });
     }
 
     #[test_only]
-    public fun set_up_migrate(pyth_state: &mut State) {
-        state::reverse_migrate__v__0_1_0(pyth_state);
+    public fun set_up_migrate(pyth_navi_state: &mut State) {
+        state::reverse_migrate__v__0_1_0(pyth_navi_state);
     }
 }

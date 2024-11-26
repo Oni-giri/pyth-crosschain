@@ -1,4 +1,4 @@
-module pyth::governance_action {
+module pyth_navi::governance_action {
 
     const CONTRACT_UPGRADE: u8 = 0;
     const SET_GOVERNANCE_DATA_SOURCE: u8 = 1;

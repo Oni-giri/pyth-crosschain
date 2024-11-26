@@ -1,4 +1,4 @@
-module pyth::pyth {
+module pyth_navi::pyth_navi {
     use std::vector;
     use sui::tx_context::{TxContext};
     use sui::coin::{Self, Coin};
@@ -7,17 +7,17 @@ module pyth::pyth {
     use sui::clock::{Self, Clock};
     use sui::package::{UpgradeCap};
 
-    use pyth::event::{Self as pyth_event};
-    use pyth::data_source::{Self, DataSource};
-    use pyth::state::{Self as state, State as PythState, LatestOnly};
-    use pyth::price_info::{Self, PriceInfo, PriceInfoObject};
-    use pyth::batch_price_attestation::{Self};
-    use pyth::price_feed::{Self};
-    use pyth::price::{Self, Price};
-    use pyth::price_identifier::{PriceIdentifier};
-    use pyth::setup::{Self, DeployerCap};
-    use pyth::hot_potato_vector::{Self, HotPotatoVector};
-    use pyth::accumulator::{Self};
+    use pyth_navi::event::{Self as pyth_navi_event};
+    use pyth_navi::data_source::{Self, DataSource};
+    use pyth_navi::state::{Self as state, State as PythState, LatestOnly};
+    use pyth_navi::price_info::{Self, PriceInfo, PriceInfoObject};
+    use pyth_navi::batch_price_attestation::{Self};
+    use pyth_navi::price_feed::{Self};
+    use pyth_navi::price::{Self, Price};
+    use pyth_navi::price_identifier::{PriceIdentifier};
+    use pyth_navi::setup::{Self, DeployerCap};
+    use pyth_navi::hot_potato_vector::{Self, HotPotatoVector};
+    use pyth_navi::accumulator::{Self};
 
     use wormhole::external_address::{Self};
     use wormhole::vaa::{Self, VAA};
@@ -32,10 +32,10 @@ module pyth::pyth {
     const E_PRICE_UPDATE_NOT_FOUND_FOR_PRICE_INFO_OBJECT: u64 = 5;
 
     #[test_only]
-    friend pyth::pyth_tests;
+    friend pyth_navi::pyth_navi_tests;
 
     /// Init state and emit event corresponding to Pyth initialization.
-    public entry fun init_pyth(
+    public entry fun init_pyth_navi(
         deployer: DeployerCap,
         upgrade_cap: UpgradeCap,
         stale_price_threshold: u64,
@@ -63,7 +63,7 @@ module pyth::pyth {
         );
 
         // Emit Pyth initialization event.
-        pyth_event::emit_pyth_initialization_event();
+        pyth_navi_event::emit_pyth_navi_initialization_event();
     }
 
     fun parse_data_sources(
@@ -89,19 +89,19 @@ module pyth::pyth {
 
     /// Create and share new price feed objects if they don't already exist using accumulator message.
     public fun create_price_feeds_using_accumulator(
-        pyth_state: &mut PythState,
+        pyth_navi_state: &mut PythState,
         accumulator_message: vector<u8>,
         vaa: VAA, // the verified version of the vaa bytes encoded within the accumulator_message
         clock: &Clock,
         ctx: &mut TxContext
     ){
         // This capability ensures that the current build version is used.
-        let latest_only = state::assert_latest_only(pyth_state);
+        let latest_only = state::assert_latest_only(pyth_navi_state);
 
         // Check that the VAA is from a valid data source (emitter)
         assert!(
             state::is_valid_data_source(
-                pyth_state,
+                pyth_navi_state,
                 data_source::new(
                     (vaa::emitter_chain(&vaa) as u64),
                     vaa::emitter_address(&vaa))
@@ -114,7 +114,7 @@ module pyth::pyth {
         let price_infos = accumulator::parse_and_verify_accumulator_message(&mut accumulator_message_cursor, vaa::take_payload(vaa), clock);
 
         // Create and share new price info objects, if not already exists.
-        create_and_share_price_feeds_using_verified_price_infos(&latest_only, pyth_state, price_infos, ctx);
+        create_and_share_price_feeds_using_verified_price_infos(&latest_only, pyth_navi_state, price_infos, ctx);
 
         // destroy rest of cursor
         cursor::take_rest(accumulator_message_cursor);
@@ -124,7 +124,7 @@ module pyth::pyth {
     /// Create and share new price feed objects if they don't already exist using batch price attestation.
     /// The name of the function is kept as is to remain backward compatible
     public fun create_price_feeds(
-        pyth_state: &mut PythState,
+        pyth_navi_state: &mut PythState,
         // These vaas have been verified and consumed, so we don't have to worry about
         // doing replay protection for them.
         verified_vaas: vector<VAA>,
@@ -132,7 +132,7 @@ module pyth::pyth {
         ctx: &mut TxContext
     ){
         // This capability ensures that the current build version is used.
-        let latest_only = state::assert_latest_only(pyth_state);
+        let latest_only = state::assert_latest_only(pyth_navi_state);
 
         while (!vector::is_empty(&verified_vaas)) {
             let vaa = vector::pop_back(&mut verified_vaas);
@@ -140,7 +140,7 @@ module pyth::pyth {
             // Check that the VAA is from a valid data source (emitter)
             assert!(
                 state::is_valid_data_source(
-                    pyth_state,
+                    pyth_navi_state,
                     data_source::new(
                         (vaa::emitter_chain(&vaa) as u64),
                         vaa::emitter_address(&vaa))
@@ -152,7 +152,7 @@ module pyth::pyth {
             let price_infos = batch_price_attestation::destroy(batch_price_attestation::deserialize(vaa::take_payload(vaa), clock));
 
             // Create and share new price info objects, if not already exists.
-            create_and_share_price_feeds_using_verified_price_infos(&latest_only, pyth_state, price_infos, ctx);
+            create_and_share_price_feeds_using_verified_price_infos(&latest_only, pyth_navi_state, price_infos, ctx);
         };
         vector::destroy_empty(verified_vaas);
     }
@@ -162,14 +162,14 @@ module pyth::pyth {
     // 1) create_price_feeds
     // 2) create_price_feeds_using_accumulator
     // to create new price feeds for symbols.
-    fun create_and_share_price_feeds_using_verified_price_infos(latest_only: &LatestOnly, pyth_state: &mut PythState, price_infos: vector<PriceInfo>, ctx: &mut TxContext){
+    fun create_and_share_price_feeds_using_verified_price_infos(latest_only: &LatestOnly, pyth_navi_state: &mut PythState, price_infos: vector<PriceInfo>, ctx: &mut TxContext){
         while (!vector::is_empty(&price_infos)){
             let cur_price_info = vector::pop_back(&mut price_infos);
 
             // Only create new Sui PriceInfoObject if not already
             // registered with the Pyth State object.
             if (!state::price_feed_object_exists(
-                    pyth_state,
+                    pyth_navi_state,
                         price_feed::get_price_identifier(
                             price_info::get_price_feed(&cur_price_info)
                         )
@@ -181,7 +181,7 @@ module pyth::pyth {
                 let price_identifier = price_info::get_price_identifier(&cur_price_info);
                 let id = price_info::uid_to_inner(&new_price_info_object);
 
-                state::register_price_info_object(latest_only, pyth_state, price_identifier, id);
+                state::register_price_info_object(latest_only, pyth_navi_state, price_identifier, id);
 
                 transfer::public_share_object(new_price_info_object);
             }
@@ -191,17 +191,17 @@ module pyth::pyth {
 
     // verified_vaa is the verified version of the VAA encoded within the accumulator_message
     public fun create_authenticated_price_infos_using_accumulator(
-        pyth_state: &PythState,
+        pyth_navi_state: &PythState,
         accumulator_message: vector<u8>,
         verified_vaa: VAA,
         clock: &Clock,
     ): HotPotatoVector<PriceInfo> {
-        state::assert_latest_only(pyth_state);
+        state::assert_latest_only(pyth_navi_state);
 
         // verify that the VAA originates from a valid data source
         assert!(
             state::is_valid_data_source(
-                pyth_state,
+                pyth_navi_state,
                 data_source::new(
                     (vaa::emitter_chain(&verified_vaa) as u64),
                     vaa::emitter_address(&verified_vaa))
@@ -221,11 +221,11 @@ module pyth::pyth {
     /// Creates authenticated price infos using batch price attestation
     /// Name is kept as is to remain backward compatible
     public fun create_price_infos_hot_potato(
-        pyth_state: &PythState,
+        pyth_navi_state: &PythState,
         verified_vaas: vector<VAA>,
         clock: &Clock
     ): HotPotatoVector<PriceInfo> {
-        state::assert_latest_only(pyth_state);
+        state::assert_latest_only(pyth_navi_state);
 
         let price_updates = vector::empty<PriceInfo>();
         while (vector::length(&verified_vaas) != 0){
@@ -233,7 +233,7 @@ module pyth::pyth {
 
             assert!(
                 state::is_valid_data_source(
-                    pyth_state,
+                    pyth_navi_state,
                     data_source::new(
                         (vaa::emitter_chain(&cur_vaa) as u64),
                         vaa::emitter_address(&cur_vaa))
@@ -258,20 +258,20 @@ module pyth::pyth {
     /// The given fee must contain a sufficient number of coins to pay the update fee for the given vaas.
     /// The update fee amount can be queried by calling get_update_fee(&vaas).
     ///
-    /// Please read more information about the update fee here: https://docs.pyth.network/documentation/pythnet-price-feeds/on-demand#fees
+    /// Please read more information about the update fee here: https://docs.pyth_navi.network/documentation/pyth_navinet-price-feeds/on-demand#fees
     public fun update_single_price_feed(
-        pyth_state: &PythState,
+        pyth_navi_state: &PythState,
         price_updates: HotPotatoVector<PriceInfo>,
         price_info_object: &mut PriceInfoObject,
         fee: Coin<SUI>,
         clock: &Clock
     ): HotPotatoVector<PriceInfo> {
-        let latest_only = state::assert_latest_only(pyth_state);
+        let latest_only = state::assert_latest_only(pyth_navi_state);
 
         // On Sui, users get to choose which price feeds to update. They specify a single price feed to
         // update at a time. We therefore charge the base fee for each such individual update.
         // This is a departure from Eth, where users don't get to necessarily choose.
-        assert!(state::get_base_update_fee(pyth_state) <= coin::value(&fee), E_INSUFFICIENT_FEE);
+        assert!(state::get_base_update_fee(pyth_navi_state) <= coin::value(&fee), E_INSUFFICIENT_FEE);
 
         // store fee coins within price info object
         price_info::deposit_fee_coins(price_info_object, fee);
@@ -314,7 +314,7 @@ module pyth::pyth {
 
         // Update the price info object with the new updated price info.
         if (is_fresh_update(update, price_info_object)){
-            pyth_event::emit_price_feed_update(price_feed::from(price_info::get_price_feed(update)), clock::timestamp_ms(clock)/1000);
+            pyth_navi_event::emit_price_feed_update(price_feed::from(price_info::get_price_feed(update)), clock::timestamp_ms(clock)/1000);
             price_info::update_price_info_object(
                 price_info_object,
                 update
@@ -351,11 +351,11 @@ module pyth::pyth {
     /// Get the latest available price cached for the given price identifier, if that price is
     /// no older than the stale price threshold.
     ///
-    /// Please refer to the documentation at https://docs.pyth.network/documentation/pythnet-price-feeds/best-practices for
+    /// Please refer to the documentation at https://docs.pyth_navi.network/documentation/pyth_navinet-price-feeds/best-practices for
     /// how to how this price safely.
     ///
     /// Important: Pyth uses an on-demand update model, where consumers need to update the
-    /// cached prices before using them. Please read more about this at https://docs.pyth.network/documentation/pythnet-price-feeds/on-demand.
+    /// cached prices before using them. Please read more about this at https://docs.pyth_navi.network/documentation/pyth_navinet-price-feeds/on-demand.
     /// get_price() is likely to abort unless you call update_price_feeds() to update the cached price
     /// beforehand, as the cached prices may be older than the stale price threshold.
     ///
@@ -409,14 +409,14 @@ module pyth::pyth {
         assert!(age < max_age_secs, E_STALE_PRICE_UPDATE);
     }
 
-    /// Please read more information about the update fee here: https://docs.pyth.network/documentation/pythnet-price-feeds/on-demand#fees
-    public fun get_total_update_fee(pyth_state: &PythState, n: u64): u64 {
-        state::get_base_update_fee(pyth_state) * n
+    /// Please read more information about the update fee here: https://docs.pyth_navi.network/documentation/pyth_navinet-price-feeds/on-demand#fees
+    public fun get_total_update_fee(pyth_navi_state: &PythState, n: u64): u64 {
+        state::get_base_update_fee(pyth_navi_state) * n
     }
 }
 
 #[test_only]
-module pyth::pyth_tests{
+module pyth_navi::pyth_navi_tests{
     use std::vector::{Self};
 
     use sui::sui::SUI;
@@ -426,16 +426,16 @@ module pyth::pyth_tests{
     use sui::object::{Self, ID};
     use sui::clock::{Self, Clock};
 
-    use pyth::state::{State as PythState};
-    use pyth::setup::{Self};
-    use pyth::price_info::{Self, PriceInfo, PriceInfoObject};//, PriceInfo, PriceInfoObject};
-    use pyth::data_source::{Self, DataSource};
-    use pyth::pyth::{Self, create_price_infos_hot_potato, update_single_price_feed};
-    use pyth::hot_potato_vector::{Self};
-    use pyth::price_identifier::{Self};
-    use pyth::price_feed::{Self};
-    use pyth::accumulator::{Self};
-    use pyth::deserialize::{Self};
+    use pyth_navi::state::{State as PythState};
+    use pyth_navi::setup::{Self};
+    use pyth_navi::price_info::{Self, PriceInfo, PriceInfoObject};//, PriceInfo, PriceInfoObject};
+    use pyth_navi::data_source::{Self, DataSource};
+    use pyth_navi::pyth_navi::{Self, create_price_infos_hot_potato, update_single_price_feed};
+    use pyth_navi::hot_potato_vector::{Self};
+    use pyth_navi::price_identifier::{Self};
+    use pyth_navi::price_feed::{Self};
+    use pyth_navi::accumulator::{Self};
+    use pyth_navi::deserialize::{Self};
 
     use wormhole::setup::{Self as wormhole_setup, DeployerCap};
     use wormhole::external_address::{Self};
@@ -553,22 +553,22 @@ module pyth::pyth_tests{
         );
 
         // Initialize Pyth state.
-        let pyth_upgrade_cap=
+        let pyth_navi_upgrade_cap=
             package::test_publish(
-                object::id_from_address(@pyth),
+                object::id_from_address(@pyth_navi),
                 test_scenario::ctx(&mut scenario)
             );
 
         setup::init_test_only(ctx(&mut scenario));
         test_scenario::next_tx(&mut scenario, DEPLOYER);
-        let pyth_deployer_cap = test_scenario::take_from_address<setup::DeployerCap>(
+        let pyth_navi_deployer_cap = test_scenario::take_from_address<setup::DeployerCap>(
             &scenario,
             DEPLOYER
         );
 
         setup::init_and_share_state(
-            pyth_deployer_cap,
-            pyth_upgrade_cap,
+            pyth_navi_deployer_cap,
+            pyth_navi_upgrade_cap,
             stale_price_threshold,
             base_update_fee,
             data_source::new(governance_emitter_chain_id, external_address::new(bytes32::from_bytes(governance_emitter_address))),
@@ -582,8 +582,8 @@ module pyth::pyth_tests{
     }
 
     fun get_mock_price_infos(): vector<PriceInfo> {
-        use pyth::i64::Self;
-        use pyth::price::{Self};
+        use pyth_navi::i64::Self;
+        use pyth_navi::price::{Self};
         vector<PriceInfo>[
                 price_info::new_price_info(
                     1663680747,
@@ -652,14 +652,14 @@ module pyth::pyth_tests{
     fun test_get_update_fee() {
         let (scenario, test_coins, _clock) =  setup_test(500 /* stale_price_threshold */, 23 /* governance emitter chain */, x"5d1f252d5de865279b00c84bce362774c2804294ed53299bc4a0389a5defef92", vector[], BATCH_ATTESTATION_TEST_INITIAL_GUARDIANS, DEFAULT_BASE_UPDATE_FEE, 0);
         test_scenario::next_tx(&mut scenario, DEPLOYER, );
-        let pyth_state = take_shared<PythState>(&scenario);
+        let pyth_navi_state = take_shared<PythState>(&scenario);
         // Pass in a single VAA
 
         let single_vaa = vector[
             x"fb1543888001083cf2e6ef3afdcf827e89b11efd87c563638df6e1995ada9f93",
         ];
 
-        assert!(pyth::get_total_update_fee(&pyth_state, vector::length<vector<u8>>(&single_vaa)) == DEFAULT_BASE_UPDATE_FEE, 1);
+        assert!(pyth_navi::get_total_update_fee(&pyth_navi_state, vector::length<vector<u8>>(&single_vaa)) == DEFAULT_BASE_UPDATE_FEE, 1);
 
         let multiple_vaas = vector[
             x"4ee17a1a4524118de513fddcf82b77454e51be5d6fc9e29fc72dd6c204c0e4fa",
@@ -670,9 +670,9 @@ module pyth::pyth_tests{
         ];
 
         // Pass in multiple VAAs
-        assert!(pyth::get_total_update_fee(&pyth_state, vector::length<vector<u8>>(&multiple_vaas)) == 5*DEFAULT_BASE_UPDATE_FEE, 1);
+        assert!(pyth_navi::get_total_update_fee(&pyth_navi_state, vector::length<vector<u8>>(&multiple_vaas)) == 5*DEFAULT_BASE_UPDATE_FEE, 1);
 
-        return_shared(pyth_state);
+        return_shared(pyth_navi_state);
         coin::burn_for_testing<SUI>(test_coins);
         clock::destroy_for_testing(_clock);
         test_scenario::end(scenario);
@@ -685,26 +685,26 @@ module pyth::pyth_tests{
 
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        let (pyth_state, worm_state) = take_wormhole_and_pyth_states(&scenario);
+        let (pyth_navi_state, worm_state) = take_wormhole_and_pyth_navi_states(&scenario);
 
         // Pass in a corrupt VAA, which should fail deserializing
         let corrupt_vaa = x"90F8bf6A479f320ead074411a4B0e7944Ea8c9C1";
         let verified_vaas = vector[vaa::parse_and_verify(&worm_state, corrupt_vaa, &clock)];
         // Create Pyth price feed
-        pyth::create_price_feeds(
-            &mut pyth_state,
+        pyth_navi::create_price_feeds(
+            &mut pyth_navi_state,
             verified_vaas,
             &clock,
             ctx(&mut scenario)
         );
 
-        cleanup_worm_state_pyth_state_and_clock(worm_state, pyth_state, clock);
+        cleanup_worm_state_pyth_navi_state_and_clock(worm_state, pyth_navi_state, clock);
         coin::burn_for_testing<SUI>(test_coins);
         test_scenario::end(scenario);
     }
 
     #[test]
-    #[expected_failure(abort_code = pyth::pyth::E_INVALID_DATA_SOURCE)]
+    #[expected_failure(abort_code = pyth_navi::pyth_navi::E_INVALID_DATA_SOURCE)]
     fun test_create_price_feeds_invalid_data_source() {
         // Initialize the contract with some valid data sources, excluding our test VAA's source
         let data_sources = vector<DataSource>[
@@ -718,18 +718,18 @@ module pyth::pyth_tests{
         let (scenario, test_coins, clock) = setup_test(500, 23, x"5d1f252d5de865279b00c84bce362774c2804294ed53299bc4a0389a5defef92", data_sources, BATCH_ATTESTATION_TEST_INITIAL_GUARDIANS, 50, 0);
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        let (pyth_state, worm_state) = take_wormhole_and_pyth_states(&scenario);
+        let (pyth_navi_state, worm_state) = take_wormhole_and_pyth_navi_states(&scenario);
 
         let verified_vaas = get_verified_test_vaas(&worm_state, &clock);
 
-        pyth::create_price_feeds(
-            &mut pyth_state,
+        pyth_navi::create_price_feeds(
+            &mut pyth_navi_state,
             verified_vaas,
             &clock,
             ctx(&mut scenario)
         );
 
-        cleanup_worm_state_pyth_state_and_clock(worm_state, pyth_state, clock);
+        cleanup_worm_state_pyth_navi_state_and_clock(worm_state, pyth_navi_state, clock);
         coin::burn_for_testing<SUI>(test_coins);
         test_scenario::end(scenario);
     }
@@ -753,14 +753,14 @@ module pyth::pyth_tests{
         let (scenario, test_coins, clock) =  setup_test(500, 23, x"5d1f252d5de865279b00c84bce362774c2804294ed53299bc4a0389a5defef92", data_sources_for_test_vaa(), vector[x"beFA429d57cD18b7F8A4d91A2da9AB4AF05d0FBe"], DEFAULT_BASE_UPDATE_FEE, DEFAULT_COIN_TO_MINT);
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        let (pyth_state, worm_state) = take_wormhole_and_pyth_states(&scenario);
+        let (pyth_navi_state, worm_state) = take_wormhole_and_pyth_navi_states(&scenario);
 
         let verified_vaas = get_verified_test_vaas(&worm_state, &clock);
 
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        pyth::create_price_feeds(
-            &mut pyth_state,
+        pyth_navi::create_price_feeds(
+            &mut pyth_navi_state,
             verified_vaas,
             &clock,
             ctx(&mut scenario)
@@ -792,7 +792,7 @@ module pyth::pyth_tests{
 
         // Create authenticated price infos
         let vec = create_price_infos_hot_potato(
-            &pyth_state,
+            &pyth_navi_state,
             vector[vaa_1],
             &clock
         );
@@ -801,7 +801,7 @@ module pyth::pyth_tests{
 
         let fee_coins = coin::split(&mut test_coins, DEFAULT_BASE_UPDATE_FEE, ctx(&mut scenario));
         vec = update_single_price_feed(
-            &pyth_state,
+            &pyth_navi_state,
             vec,
             &mut price_info_object_1,
             fee_coins,
@@ -826,7 +826,7 @@ module pyth::pyth_tests{
         return_shared(price_info_object_4);
 
         coin::burn_for_testing(test_coins);
-        cleanup_worm_state_pyth_state_and_clock(worm_state, pyth_state, clock);
+        cleanup_worm_state_pyth_navi_state_and_clock(worm_state, pyth_navi_state, clock);
         test_scenario::end(scenario);
     }
 
@@ -848,14 +848,14 @@ module pyth::pyth_tests{
 
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        let (pyth_state, worm_state) = take_wormhole_and_pyth_states(&scenario);
+        let (pyth_navi_state, worm_state) = take_wormhole_and_pyth_navi_states(&scenario);
 
         let verified_vaa = get_verified_vaa_from_accumulator_message(&worm_state, TEST_ACCUMULATOR_SINGLE_FEED, &clock);
 
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        pyth::create_price_feeds_using_accumulator(
-            &mut pyth_state,
+        pyth_navi::create_price_feeds_using_accumulator(
+            &mut pyth_navi_state,
             TEST_ACCUMULATOR_SINGLE_FEED,
             verified_vaa,
             &clock,
@@ -874,8 +874,8 @@ module pyth::pyth_tests{
 
         // Create authenticated price infos
         verified_vaa = get_verified_vaa_from_accumulator_message(&worm_state, TEST_ACCUMULATOR_SINGLE_FEED, &clock);
-        let auth_price_infos = pyth::create_authenticated_price_infos_using_accumulator(
-            &pyth_state,
+        let auth_price_infos = pyth_navi::create_authenticated_price_infos_using_accumulator(
+            &pyth_navi_state,
             TEST_ACCUMULATOR_SINGLE_FEED,
             verified_vaa,
             &clock
@@ -883,7 +883,7 @@ module pyth::pyth_tests{
 
         test_scenario::next_tx(&mut scenario, DEPLOYER);
         auth_price_infos = update_single_price_feed(
-            &pyth_state,
+            &pyth_navi_state,
             auth_price_infos,
             &mut price_info_object_1,
             coins,
@@ -901,27 +901,27 @@ module pyth::pyth_tests{
 
         return_shared(price_info_object_1);
 
-        cleanup_worm_state_pyth_state_and_clock(worm_state, pyth_state, clock);
+        cleanup_worm_state_pyth_navi_state_and_clock(worm_state, pyth_navi_state, clock);
         test_scenario::end(scenario);
     }
 
     #[test]
-    #[expected_failure(abort_code = pyth::accumulator::E_INVALID_PROOF)]
+    #[expected_failure(abort_code = pyth_navi::accumulator::E_INVALID_PROOF)]
     fun test_create_and_update_single_price_feed_with_accumulator_failure() {
 
         let (scenario, coins, clock) = setup_test(500, 23, ACCUMULATOR_TESTS_EMITTER_ADDRESS, ACCUMULATOR_TESTS_DATA_SOURCE(), ACCUMULATOR_TESTS_INITIAL_GUARDIANS, DEFAULT_BASE_UPDATE_FEE, DEFAULT_COIN_TO_MINT);
 
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        let (pyth_state, worm_state) = take_wormhole_and_pyth_states(&scenario);
+        let (pyth_navi_state, worm_state) = take_wormhole_and_pyth_navi_states(&scenario);
 
         // the verified vaa here contains the wrong merkle root
         let verified_vaa = get_verified_vaa_from_accumulator_message(&worm_state, TEST_ACCUMULATOR_3_MSGS, &clock);
 
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        pyth::create_price_feeds_using_accumulator(
-            &mut pyth_state,
+        pyth_navi::create_price_feeds_using_accumulator(
+            &mut pyth_navi_state,
             TEST_ACCUMULATOR_SINGLE_FEED,
             verified_vaa,
             &clock,
@@ -932,7 +932,7 @@ module pyth::pyth_tests{
         test_scenario::next_tx(&mut scenario, DEPLOYER);
         coin::burn_for_testing<SUI>(coins);
 
-        cleanup_worm_state_pyth_state_and_clock(worm_state, pyth_state, clock);
+        cleanup_worm_state_pyth_navi_state_and_clock(worm_state, pyth_navi_state, clock);
         test_scenario::end(scenario);
     }
 
@@ -940,21 +940,21 @@ module pyth::pyth_tests{
     const TEST_ACCUMULATOR_INVALID_PROOF_1: vector<u8> = x"504e41550100000000a001000000000100110db9cd8325ccfab0dae92eeb9ea70a1faba5c5e96dc21ff46a8ddc560afc9a60df096b8ff21172804692bbdc958153e838437d8b474cbf45f0dc2a8acae831000000000000000000000171f8dcb863d176e2c420ad6610cf687359612b6fb392e0642b0ca6b1f186aa3b0000000000000000004155575600000000000000000000000000a8bea2b5f12f3177ff9b3929d77c3476ab2d32c602005500b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6fa75cd3aa3bb5ace5e2516446f71f85be36bd19bb0703f3154bb3db07be59f3f377c0d3f44661d9a8736c68884c8169e8b636ee3043202397384073120dce9e5d0efe24b44b4a0d62da8a1180177cf30b2c0bebbb1adfe8f7985d051d205a01e2504d9f0c06e7e7cb0cf24116098ca202ac5f6ade2e8f5a12ec006b16d46be1f0228b94d950055006e1540171b6c0c960b71a7020d9f60077f6af931a8bbf590da0223dacf75c7af5f958f4883f9d2a8b5b1008d1fa01db95cf4a8c7423a695e81ad1eb504f8554c3620c3fd40b40f7d581ac802e2de5cb82a9ae672043202397384073120dce9e5d0efe24b44b4a0d62da8a1180177cf30b2c0bebbb1adfe8f7985d051d205a01e2504d9f0c06e7e7cb0cf24116098ca202ac5f6ade2e8f5a12ec006b16d46be1f0228b94d95";
 
      #[test]
-    #[expected_failure(abort_code = pyth::accumulator::E_INVALID_PROOF)]
+    #[expected_failure(abort_code = pyth_navi::accumulator::E_INVALID_PROOF)]
     fun test_accumulator_invalid_proof() {
 
         let (scenario, coins, clock) = setup_test(500, 23, ACCUMULATOR_TESTS_EMITTER_ADDRESS, ACCUMULATOR_TESTS_DATA_SOURCE(), ACCUMULATOR_TESTS_INITIAL_GUARDIANS, DEFAULT_BASE_UPDATE_FEE, DEFAULT_COIN_TO_MINT);
 
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        let (pyth_state, worm_state) = take_wormhole_and_pyth_states(&scenario);
+        let (pyth_navi_state, worm_state) = take_wormhole_and_pyth_navi_states(&scenario);
 
         let verified_vaa = get_verified_vaa_from_accumulator_message(&worm_state, TEST_ACCUMULATOR_INVALID_PROOF_1, &clock);
 
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        pyth::create_price_feeds_using_accumulator(
-            &mut pyth_state,
+        pyth_navi::create_price_feeds_using_accumulator(
+            &mut pyth_navi_state,
             TEST_ACCUMULATOR_INVALID_PROOF_1,
             verified_vaa,
             &clock,
@@ -965,7 +965,7 @@ module pyth::pyth_tests{
         test_scenario::next_tx(&mut scenario, DEPLOYER);
         coin::burn_for_testing<SUI>(coins);
 
-        cleanup_worm_state_pyth_state_and_clock(worm_state, pyth_state, clock);
+        cleanup_worm_state_pyth_navi_state_and_clock(worm_state, pyth_navi_state, clock);
         test_scenario::end(scenario);
     }
 
@@ -973,21 +973,21 @@ module pyth::pyth_tests{
     const TEST_ACCUMULATOR_INVALID_MAJOR_VERSION: vector<u8> = x"504e41553c00000000a001000000000100496b7fbd18dca2f0e690712fd8ca522ff79ca7d9d6d22e9f5d753fba4bd16fff440a811bad710071c79859290bcb1700de49dd8400db90b048437b521200123e010000000000000000000171f8dcb863d176e2c420ad6610cf687359612b6fb392e0642b0ca6b1f186aa3b000000000000000000415557560000000000000000000000000005f5db4488a7cae9f9a6c1938340c0fbf4beb9090200550031ecc21a745e3968a04e9570e4425bc18fa8019c68028196b546d1669c200c6879bc5a3617ec3444d93c06501cf6a0909c38d4ec81d96026b71ec475e87d69c7b5124289adbf24212bed8c15db354391d2378d2e0454d2655c6c34e7e50580fd8c94511322968bbc6da8a1180177cf30b2c0bebbb1adfe8f7985d051d205a01e2504d9f0c06e7e7cb0cf24116098ca202ac5f6ade2e8f5a12ec006b16d46be1f0228b94d95005500944998273e477b495144fb8794c914197f3ccb46be2900f4698fd0ef743c9695a573a6ff665ff63edb5f9a85ad579dc14500a2112c09680fc146134f9a539ca82cb6e3501c801278fd08d80732a24118292866bb049e6e88181a1e1e8b6d3c6bbb95135a73041f3b56a8a1180177cf30b2c0bebbb1adfe8f7985d051d205a01e2504d9f0c06e7e7cb0cf24116098ca202ac5f6ade2e8f5a12ec006b16d46be1f0228b94d95";
 
     #[test]
-    #[expected_failure(abort_code = pyth::accumulator::E_INVALID_ACCUMULATOR_PAYLOAD)]
+    #[expected_failure(abort_code = pyth_navi::accumulator::E_INVALID_ACCUMULATOR_PAYLOAD)]
     fun test_accumulator_invalid_major_version() {
 
         let (scenario, coins, clock) = setup_test(500, 23, ACCUMULATOR_TESTS_EMITTER_ADDRESS, ACCUMULATOR_TESTS_DATA_SOURCE(), ACCUMULATOR_TESTS_INITIAL_GUARDIANS, DEFAULT_BASE_UPDATE_FEE, DEFAULT_COIN_TO_MINT);
 
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        let (pyth_state, worm_state) = take_wormhole_and_pyth_states(&scenario);
+        let (pyth_navi_state, worm_state) = take_wormhole_and_pyth_navi_states(&scenario);
 
         let verified_vaa = get_verified_vaa_from_accumulator_message(&worm_state, TEST_ACCUMULATOR_INVALID_MAJOR_VERSION, &clock);
 
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        pyth::create_price_feeds_using_accumulator(
-            &mut pyth_state,
+        pyth_navi::create_price_feeds_using_accumulator(
+            &mut pyth_navi_state,
             TEST_ACCUMULATOR_INVALID_MAJOR_VERSION,
             verified_vaa,
             &clock,
@@ -998,7 +998,7 @@ module pyth::pyth_tests{
         test_scenario::next_tx(&mut scenario, DEPLOYER);
         coin::burn_for_testing<SUI>(coins);
 
-        cleanup_worm_state_pyth_state_and_clock(worm_state, pyth_state, clock);
+        cleanup_worm_state_pyth_navi_state_and_clock(worm_state, pyth_navi_state, clock);
         test_scenario::end(scenario);
     }
 
@@ -1006,21 +1006,21 @@ module pyth::pyth_tests{
     const TEST_ACCUMULATOR_INVALID_WH_MSG: vector<u8> = x"504e41550100000000a001000000000100e87f98238c5357730936cfdfde3a37249e5219409a4f41b301924b8eb10815a43ea2f96e4fe1bc8cd398250f39448d3b8ca57c96f9cf7a2be292517280683caa010000000000000000000171f8dcb863d176e2c420ad6610cf687359612b6fb392e0642b0ca6b1f186aa3b00000000000000000041555755000000000000000000000000000fb6f9f2b3b6cc1c9ef6708985fef226d92a3c0801005500b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6fa75cd3aa3bb5ace5e2516446f71f85be36bd19b000000006491cc747be59f3f377c0d3f44661d9a8736c68884c8169e8b636ee301f2ee15ea639b73fa3db9b34a245bdfa015c260c5";
 
     #[test]
-    #[expected_failure(abort_code = pyth::accumulator::E_INVALID_WORMHOLE_MESSAGE)]
+    #[expected_failure(abort_code = pyth_navi::accumulator::E_INVALID_WORMHOLE_MESSAGE)]
     fun test_accumulator_invalid_wormhole_message() {
 
         let (scenario, coins, clock) = setup_test(500, 23, ACCUMULATOR_TESTS_EMITTER_ADDRESS, ACCUMULATOR_TESTS_DATA_SOURCE(), ACCUMULATOR_TESTS_INITIAL_GUARDIANS, DEFAULT_BASE_UPDATE_FEE, DEFAULT_COIN_TO_MINT);
 
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        let (pyth_state, worm_state) = take_wormhole_and_pyth_states(&scenario);
+        let (pyth_navi_state, worm_state) = take_wormhole_and_pyth_navi_states(&scenario);
 
         let verified_vaa = get_verified_vaa_from_accumulator_message(&worm_state, TEST_ACCUMULATOR_INVALID_WH_MSG, &clock);
 
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        pyth::create_price_feeds_using_accumulator(
-            &mut pyth_state,
+        pyth_navi::create_price_feeds_using_accumulator(
+            &mut pyth_navi_state,
             TEST_ACCUMULATOR_INVALID_WH_MSG,
             verified_vaa,
             &clock,
@@ -1031,7 +1031,7 @@ module pyth::pyth_tests{
         test_scenario::next_tx(&mut scenario, DEPLOYER);
         coin::burn_for_testing<SUI>(coins);
 
-        cleanup_worm_state_pyth_state_and_clock(worm_state, pyth_state, clock);
+        cleanup_worm_state_pyth_navi_state_and_clock(worm_state, pyth_navi_state, clock);
         test_scenario::end(scenario);
     }
 
@@ -1048,12 +1048,12 @@ module pyth::pyth_tests{
 
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        let (pyth_state, worm_state) = take_wormhole_and_pyth_states(&scenario);
+        let (pyth_navi_state, worm_state) = take_wormhole_and_pyth_navi_states(&scenario);
 
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        pyth::create_price_feeds_using_accumulator(
-            &mut pyth_state,
+        pyth_navi::create_price_feeds_using_accumulator(
+            &mut pyth_navi_state,
             TEST_ACCUMULATOR_EXTRA_PAYLOAD,
             get_verified_vaa_from_accumulator_message(&worm_state, TEST_ACCUMULATOR_EXTRA_PAYLOAD, &clock),
             &clock,
@@ -1062,8 +1062,8 @@ module pyth::pyth_tests{
 
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        pyth::create_price_feeds_using_accumulator(
-            &mut pyth_state,
+        pyth_navi::create_price_feeds_using_accumulator(
+            &mut pyth_navi_state,
             TEST_ACCUMULATOR_INCREASED_MINOR_VERSION,
             get_verified_vaa_from_accumulator_message(&worm_state, TEST_ACCUMULATOR_INCREASED_MINOR_VERSION, &clock),
             &clock,
@@ -1074,7 +1074,7 @@ module pyth::pyth_tests{
         test_scenario::next_tx(&mut scenario, DEPLOYER);
         coin::burn_for_testing<SUI>(coins);
 
-        cleanup_worm_state_pyth_state_and_clock(worm_state, pyth_state, clock);
+        cleanup_worm_state_pyth_navi_state_and_clock(worm_state, pyth_navi_state, clock);
         test_scenario::end(scenario);
     }
 
@@ -1116,14 +1116,14 @@ module pyth::pyth_tests{
 
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        let (pyth_state, worm_state) = take_wormhole_and_pyth_states(&scenario);
+        let (pyth_navi_state, worm_state) = take_wormhole_and_pyth_navi_states(&scenario);
 
         let verified_vaa = get_verified_vaa_from_accumulator_message(&worm_state, TEST_ACCUMULATOR_3_MSGS, &clock);
 
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        pyth::create_price_feeds_using_accumulator(
-            &mut pyth_state,
+        pyth_navi::create_price_feeds_using_accumulator(
+            &mut pyth_navi_state,
             TEST_ACCUMULATOR_3_MSGS,
             verified_vaa,
             &clock,
@@ -1140,8 +1140,8 @@ module pyth::pyth_tests{
 
         // Create authenticated price infos
         verified_vaa = get_verified_vaa_from_accumulator_message(&worm_state, TEST_ACCUMULATOR_3_MSGS, &clock);
-        let auth_price_infos = pyth::create_authenticated_price_infos_using_accumulator(
-            &pyth_state,
+        let auth_price_infos = pyth_navi::create_authenticated_price_infos_using_accumulator(
+            &pyth_navi_state,
             TEST_ACCUMULATOR_3_MSGS,
             verified_vaa,
             &clock
@@ -1154,7 +1154,7 @@ module pyth::pyth_tests{
             let coin_split = coin::split(&mut coins, 1000, ctx(&mut scenario));
             let price_info_object = take_shared<PriceInfoObject>(&scenario);
             auth_price_infos = update_single_price_feed(
-                &pyth_state,
+                &pyth_navi_state,
                 auth_price_infos,
                 &mut price_info_object,
                 coin_split,
@@ -1171,12 +1171,12 @@ module pyth::pyth_tests{
         test_scenario::next_tx(&mut scenario, DEPLOYER);
         hot_potato_vector::destroy<PriceInfo>(auth_price_infos);
 
-        cleanup_worm_state_pyth_state_and_clock(worm_state, pyth_state, clock);
+        cleanup_worm_state_pyth_navi_state_and_clock(worm_state, pyth_navi_state, clock);
         test_scenario::end(scenario);
     }
 
     #[test]
-    #[expected_failure(abort_code = pyth::pyth::E_INSUFFICIENT_FEE)]
+    #[expected_failure(abort_code = pyth_navi::pyth_navi::E_INSUFFICIENT_FEE)]
     fun test_create_and_update_price_feeds_insufficient_fee() {
 
         // this is not enough fee and will cause a failure
@@ -1185,14 +1185,14 @@ module pyth::pyth_tests{
         let (scenario, test_coins, clock) =  setup_test(500, 23, x"5d1f252d5de865279b00c84bce362774c2804294ed53299bc4a0389a5defef92", data_sources_for_test_vaa(), vector[x"beFA429d57cD18b7F8A4d91A2da9AB4AF05d0FBe"], DEFAULT_BASE_UPDATE_FEE, coins_to_mint);
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        let (pyth_state, worm_state) = take_wormhole_and_pyth_states(&scenario);
+        let (pyth_navi_state, worm_state) = take_wormhole_and_pyth_navi_states(&scenario);
 
         let verified_vaas = get_verified_test_vaas(&worm_state, &clock);
 
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        pyth::create_price_feeds(
-            &mut pyth_state,
+        pyth_navi::create_price_feeds(
+            &mut pyth_navi_state,
             verified_vaas,
             &clock,
             ctx(&mut scenario)
@@ -1224,14 +1224,14 @@ module pyth::pyth_tests{
 
         // Create authenticated price infos
         let vec = create_price_infos_hot_potato(
-            &pyth_state,
+            &pyth_navi_state,
             vector[vaa_1],
             &clock
         );
 
         test_scenario::next_tx(&mut scenario, DEPLOYER);
         vec = update_single_price_feed(
-            &pyth_state,
+            &pyth_navi_state,
             vec,
             &mut price_info_object_1,
             test_coins,
@@ -1248,7 +1248,7 @@ module pyth::pyth_tests{
         return_shared(price_info_object_3);
         return_shared(price_info_object_4);
 
-        cleanup_worm_state_pyth_state_and_clock(worm_state, pyth_state, clock);
+        cleanup_worm_state_pyth_navi_state_and_clock(worm_state, pyth_navi_state, clock);
         test_scenario::end(scenario);
     }
 
@@ -1258,13 +1258,13 @@ module pyth::pyth_tests{
         let (scenario, test_coins, clock) =  setup_test(500, 23, x"5d1f252d5de865279b00c84bce362774c2804294ed53299bc4a0389a5defef92", data_sources_for_test_vaa(), BATCH_ATTESTATION_TEST_INITIAL_GUARDIANS, DEFAULT_BASE_UPDATE_FEE, DEFAULT_COIN_TO_MINT);
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        let (pyth_state, worm_state) = take_wormhole_and_pyth_states(&scenario);
+        let (pyth_navi_state, worm_state) = take_wormhole_and_pyth_navi_states(&scenario);
 
         let verified_vaas = get_verified_test_vaas(&worm_state, &clock);
 
         // Update cache is called by create_price_feeds.
-        pyth::create_price_feeds(
-            &mut pyth_state,
+        pyth_navi::create_price_feeds(
+            &mut pyth_navi_state,
             verified_vaas,
             &clock,
             ctx(&mut scenario)
@@ -1302,23 +1302,23 @@ module pyth::pyth_tests{
         return_shared(price_info_object_4);
         coin::burn_for_testing<SUI>(test_coins);
 
-        cleanup_worm_state_pyth_state_and_clock(worm_state, pyth_state, clock);
+        cleanup_worm_state_pyth_navi_state_and_clock(worm_state, pyth_navi_state, clock);
         test_scenario::end(scenario);
     }
 
     #[test]
     fun test_update_cache_old_update() {
-        use pyth::i64::Self;
-        use pyth::price::Self;
+        use pyth_navi::i64::Self;
+        use pyth_navi::price::Self;
 
         let (scenario, test_coins, clock) =  setup_test(500, 23, x"5d1f252d5de865279b00c84bce362774c2804294ed53299bc4a0389a5defef92", data_sources_for_test_vaa(), BATCH_ATTESTATION_TEST_INITIAL_GUARDIANS, DEFAULT_BASE_UPDATE_FEE, DEFAULT_COIN_TO_MINT);
         test_scenario::next_tx(&mut scenario, DEPLOYER);
 
-        let (pyth_state, worm_state) = take_wormhole_and_pyth_states(&scenario);
+        let (pyth_navi_state, worm_state) = take_wormhole_and_pyth_navi_states(&scenario);
         let verified_vaas = get_verified_test_vaas(&worm_state, &clock);
 
-        pyth::create_price_feeds(
-            &mut pyth_state,
+        pyth_navi::create_price_feeds(
+            &mut pyth_navi_state,
             verified_vaas,
             &clock,
             ctx(&mut scenario)
@@ -1350,8 +1350,8 @@ module pyth::pyth_tests{
                     old_ema_price,
             )
         );
-        let latest_only = pyth::state::create_latest_only_for_test();
-        pyth::update_cache(latest_only, &old_update, &mut price_info_object_1, &clock);
+        let latest_only = pyth_navi::state::create_latest_only_for_test();
+        pyth_navi::update_cache(latest_only, &old_update, &mut price_info_object_1, &clock);
 
         let current_price_info = price_info::get_price_info_from_price_info_object(&price_info_object_1);
         let current_price_feed = price_info::get_price_feed(&current_price_info);
@@ -1378,8 +1378,8 @@ module pyth::pyth_tests{
             )
         );
 
-        let latest_only = pyth::state::create_latest_only_for_test();
-        pyth::update_cache(latest_only, &fresh_update, &mut price_info_object_1, &clock);
+        let latest_only = pyth_navi::state::create_latest_only_for_test();
+        pyth_navi::update_cache(latest_only, &fresh_update, &mut price_info_object_1, &clock);
 
         // Confirm that the Pyth cached price got updated to fresh_price.
         let current_price_info = price_info::get_price_info_from_price_info_object(&price_info_object_1);
@@ -1396,11 +1396,11 @@ module pyth::pyth_tests{
         return_shared(price_info_object_4);
 
         coin::burn_for_testing<SUI>(test_coins);
-        cleanup_worm_state_pyth_state_and_clock(worm_state, pyth_state, clock);
+        cleanup_worm_state_pyth_navi_state_and_clock(worm_state, pyth_navi_state, clock);
         test_scenario::end(scenario);
     }
 
-    // pyth accumulator tests (included in this file instead of pyth_accumulator.move to avoid dependency cycle - as we need pyth_tests::setup_test)
+    // pyth_navi accumulator tests (included in this file instead of pyth_navi_accumulator.move to avoid dependency cycle - as we need pyth_navi_tests::setup_test)
     #[test]
     fun test_parse_and_verify_accumulator_updates(){
         use sui::test_scenario::{Self, take_shared, return_shared};
@@ -1476,8 +1476,8 @@ module pyth::pyth_tests{
 
     // accumulator_test_3_to_price_info gets the data encoded within TEST_ACCUMULATOR_3_MSGS
     fun accumulator_test_3_to_price_info(offset: u64): vector<PriceInfo> {
-        use pyth::i64::{Self};
-        use pyth::price::{Self};
+        use pyth_navi::i64::{Self};
+        use pyth_navi::price::{Self};
         let i = 0;
         let feed_ids = vector[x"b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6",
             x"6e1540171b6c0c960b71a7020d9f60077f6af931a8bbf590da0223dacf75c7af",
@@ -1512,8 +1512,8 @@ module pyth::pyth_tests{
 
     // accumulator_test_1_to_price_info gets the data encoded within TEST_ACCUMULATOR_SINGLE_FEED
     fun accumulator_test_1_to_price_info(): PriceInfo {
-        use pyth::i64::{Self};
-        use pyth::price::{Self};
+        use pyth_navi::i64::{Self};
+        use pyth_navi::price::{Self};
         price_info::new_price_info(
                 1663680747,
                 1663074349,
@@ -1537,13 +1537,13 @@ module pyth::pyth_tests{
             )
     }
 
-    public fun cleanup_worm_state_pyth_state_and_clock(worm_state: WormState, pyth_state: PythState, clock: Clock){
+    public fun cleanup_worm_state_pyth_navi_state_and_clock(worm_state: WormState, pyth_navi_state: PythState, clock: Clock){
         return_shared(worm_state);
-        return_shared(pyth_state);
+        return_shared(pyth_navi_state);
         clock::destroy_for_testing(clock);
     }
 
-    public fun take_wormhole_and_pyth_states(scenario: &Scenario): (PythState, WormState){
+    public fun take_wormhole_and_pyth_navi_states(scenario: &Scenario): (PythState, WormState){
         (take_shared<PythState>(scenario), take_shared<WormState>(scenario))
     }
 }

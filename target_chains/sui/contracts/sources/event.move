@@ -1,9 +1,9 @@
-module pyth::event {
+module pyth_navi::event {
     use sui::event::{Self};
-    use pyth::price_feed::{PriceFeed};
+    use pyth_navi::price_feed::{PriceFeed};
 
-    friend pyth::pyth;
-    friend pyth::state;
+    friend pyth_navi::pyth_navi;
+    friend pyth_navi::state;
 
     struct PythInitializationEvent has copy, drop {}
 
@@ -24,7 +24,7 @@ module pyth::event {
         );
     }
 
-    public(friend) fun emit_pyth_initialization_event() {
+    public(friend) fun emit_pyth_navi_initialization_event() {
         event::emit(
             PythInitializationEvent {}
         );

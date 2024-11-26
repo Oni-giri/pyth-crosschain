@@ -1,5 +1,5 @@
-module pyth::price {
-    use pyth::i64::I64;
+module pyth_navi::price {
+    use pyth_navi::i64::I64;
 
     /// A price with a degree of uncertainty, represented as a price +- a confidence interval.
     ///
@@ -7,7 +7,7 @@ module pyth::price {
     /// Both the price and confidence are stored in a fixed-point numeric representation,
     /// `x * (10^expo)`, where `expo` is the exponent.
     //
-    /// Please refer to the documentation at https://docs.pyth.network/documentation/pythnet-price-feeds/best-practices for how
+    /// Please refer to the documentation at https://docs.pyth_navi.network/documentation/pyth_navinet-price-feeds/best-practices for how
     /// to how this price safely.
     struct Price has copy, drop, store {
         price: I64,
