@@ -8,12 +8,12 @@ subdir = "crates/sui-framework/packages/sui-framework"
 rev = "mainnet"
 
 [dependencies.MoveStdlib]
-override = true
 git = "https://github.com/MystenLabs/sui.git"
 subdir = "crates/sui-framework/packages/move-stdlib"
 rev = "framework/mainnet"
 
 [dependencies.Wormhole]
+override = true
 git = "https://github.com/wormhole-foundation/wormhole.git"
 subdir = "sui/wormhole"
 rev = "82d82bffd5a8566e4b5d94be4e4678ad55ab1f4f"
